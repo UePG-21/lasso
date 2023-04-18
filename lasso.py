@@ -280,7 +280,7 @@ class Lasso:
         lmd_max : int | float | None, optional
             Maximum `lambda`, by default None
         step_size : int | float, optional
-            Step size of `lambda` change, by default 0.02
+            Step size of `lambda` change, by default 0.1
         max_iter : int, optional
             The maximum number of iterations, by default 100
         stop_crit : float, optional
@@ -389,4 +389,4 @@ if __name__ == "__main__":
     start = time.time()
     lasso.path_fit(y, X)
     print(time.time() - start)
-    lasso.draw_beta_path()
+    # lasso.draw_beta_path()
