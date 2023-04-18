@@ -22,8 +22,18 @@ class Lasso:
     Optimization method: coordinate descent
     """
 
-    def __init__(self) -> None:
-        """Initialization"""
+    def __init__(self, max_iter: int = 1000, stop_crit: float = 0.001) -> None:
+        """Initialization
+
+        Parameters
+        ----------
+        max_iter : int, optional
+            The maximum number of iterations, by default 1000
+        stop_crit : float, optional
+            Stopping criterion for beta_0 and beta update, which is if all bete's
+            absolute update percentages are less than this number in a coordinate
+            descent loop, by default 0.001
+        """
         self.n = None  # sample size
         self.p = None  # feature size
         self.y = None  # target, n*1
@@ -32,8 +42,8 @@ class Lasso:
         self.beta = None  # array of beta_j
         self.beta_0 = None  # beta_0
         self.lmd = None  # lambda
-        self.max_iter = None  # maximum iterations
-        self.stop_crit = None  # stopping criterion
+        self.max_iter = max_iter  # maximum iterations
+        self.stop_crit = stop_crit  # stopping criterion
         self.y_bar = None  # sample mean of y
         self.X_bar = None  # sample means of X_j
         self.y_X = None  # inner products of y and X_j
@@ -178,8 +188,6 @@ class Lasso:
         y: np.ndarray | pd.DataFrame,
         X: np.ndarray | pd.DataFrame,
         lmd: int | float,
-        max_iter: int = 100,
-        stop_crit: float = 0.001,
     ) -> "Lasso":
         """Fit model
 
@@ -191,12 +199,6 @@ class Lasso:
             Features
         lmd : int | float
             lambda as the regularization parameter
-        max_iter : int, optional
-            The maximum number of iterations, by default 100
-        stop_crit : float, optional
-            Stopping criterion for beta_0 and beta update, which is if all bete's
-            absolute update percentages are less than this number in a coordinate
-            descent loop, by default 0.001
 
         Returns
         -------
@@ -212,8 +214,6 @@ class Lasso:
         self.features = X.columns if isinstance(X, pd.DataFrame) else None
         self.n, self.p = X.shape
         self.lmd = lmd
-        self.max_iter = max_iter
-        self.stop_crit = stop_crit
         # precompute
         self.y_bar, self.X_bar = self._sample_means()
         self.y_X, self.o_X, self.X_X = self._inner_prods()
@@ -226,8 +226,6 @@ class Lasso:
     def refit(
         self,
         lmd: int | float,
-        max_iter: int = 100,
-        stop_crit: float = 0.001,
     ) -> "Lasso":
         """Refit with a new `lambda`
 
@@ -235,22 +233,14 @@ class Lasso:
         ----------
         lmd : int | float
             `lambda` as the regularization parameter
-        max_iter : int, optional
-            The maximum number of iterations, by default 100
-        stop_crit : float, optional
-            Stopping criterion for beta_0 and beta update, which is if all bete's
-            absolute update percentages are less than this number in a coordinate
-            descent loop, by default 0.001
 
         Returns
         -------
         Lasso
             The model itself
         """
-        # set new attributes
+        # set new lambda
         self.lmd = lmd
-        self.max_iter = max_iter
-        self.stop_crit = stop_crit
         # initialize beta_0 and beta
         self._initalize_beta()
         # coordinate descent
@@ -264,8 +254,6 @@ class Lasso:
         lmd_min: int | float | None = None,
         lmd_max: int | float | None = None,
         step_size: int | float = 0.1,
-        max_iter: int = 100,
-        stop_crit: float = 0.001,
     ) -> "Lasso":
         """Fit model with different `lambda`'s to get pathes of `beta`
 
@@ -281,12 +269,6 @@ class Lasso:
             Maximum `lambda`, by default None
         step_size : int | float, optional
             Step size of `lambda` change, by default 0.1
-        max_iter : int, optional
-            The maximum number of iterations, by default 100
-        stop_crit : float, optional
-            Stopping criterion for `beta_0` and beta update, which is if all `beta`'s
-            absolute update percentages are less than this number in a coordinate
-            descent loop, by default 0.001
 
         Returns
         -------
@@ -305,8 +287,6 @@ class Lasso:
         self.y, self.X = np.array(y), np.array(X)
         self.features = X.columns if isinstance(X, pd.DataFrame) else None
         self.n, self.p = X.shape
-        self.max_iter = max_iter
-        self.stop_crit = stop_crit
         # precompute
         self.y_bar, self.X_bar = self._sample_means()
         self.y_X, self.o_X, self.X_X = self._inner_prods()
@@ -315,7 +295,7 @@ class Lasso:
         lmd = lmd_min
         flag = True
         while flag and lmd <= lmd_max:
-            self.refit(lmd, max_iter, stop_crit)
+            self.refit(lmd)
             lmd_path.append(lmd)
             beta_path.append(self.beta)
             beta_0_path.append(self.beta_0)
@@ -347,7 +327,7 @@ class Lasso:
                 legends = list(range(1, 1 + self.p))
             else:
                 legends = self.features
-            plt.legend(legends)
+            plt.legend(legends, fontsize=8)
         plt.show()
 
     def predict(self, X: np.ndarray | pd.DataFrame) -> np.ndarray | pd.DataFrame:
@@ -372,21 +352,13 @@ class Lasso:
 
 
 if __name__ == "__main__":
-    n, p = 1000, 30
-    p1 = 15
-    p2 = 15
-    X1 = np.random.normal(0, 1, (n, p1))
-    X2 = np.random.normal(0, 1, (n, p2))
-    X = np.hstack([X1, X2])
+    n, p = 1000, 3
+    X = np.random.normal(0, 1, (n, p))
     eps = np.random.randn(n)
-    beta = np.random.randn(p) * 3
-    beta_0 = 10
-    y = beta_0 + X.dot(beta) + eps
-    X = pd.DataFrame(X)
-    lasso = Lasso()
-    import time
+    beta_true = np.array([3, -17, 5])
+    beta_0_true = 0
+    y = beta_0_true + X.dot(beta_true) + eps
 
-    start = time.time()
+    lasso = Lasso()
     lasso.path_fit(y, X)
-    print(time.time() - start)
-    # lasso.draw_beta_path()
+    lasso.draw_beta_path(True)
