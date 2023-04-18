@@ -119,7 +119,7 @@ class Lasso:
         Returns
         -------
         float
-            inner product of `Z_j` and `X_j`
+            Inner product of `Z_j` and `X_j`
         """
         res = self.y_X[j] - self.beta_0 * self.o_X[j]
         res -= (self.beta.reshape((self.p, 1)) * self.X.T).dot(self.X[:, j]).sum()
