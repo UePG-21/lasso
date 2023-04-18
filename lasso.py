@@ -49,6 +49,8 @@ class Lasso:
         self.y_X = None  # inner products of y and X_j
         self.o_X = None  # inner products of 1 and X_j
         self.X_X = None  # inner products of X_k and X_j
+        self.lmd_min = None  # minimum lambda
+        self.lmd_max = None  # maximum lambda
         self.lmd_path = None  # path of lambda, 1*l
         self.beta_path = None  # pathes of beta, p*l
         self.beta_0_path = None  # pathes of beta_0, 1*l
@@ -301,7 +303,8 @@ class Lasso:
             beta_0_path.append(self.beta_0)
             lmd += step_size
             flag = (np.abs(beta_path[-1]) > 1e-9).any()
-        # store result
+        # store results
+        self.lmd_min, self.lmd_max = lmd_min, lmd
         self.lmd_path = np.array(lmd_path)
         self.beta_path = np.array(beta_path).T
         self.beta_0_path = np.array(beta_0_path)
