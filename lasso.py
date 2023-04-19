@@ -88,7 +88,7 @@ class Lasso:
     def soft_thresh(
         b: int | float | np.ndarray, gamma: int | float | np.ndarray
     ) -> float | np.ndarray:
-        """Soft-threshold function, S(b, gamma) = sign(b) * max(0, |n| - gamma), which
+        """Soft-threshold function, S(b, gamma) = sign(b) * max(0, |b| - gamma), which
         is the minimizer of (1/2) * (x-b)^2 + gamma * |x|
 
         Parameters
