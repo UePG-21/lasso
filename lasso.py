@@ -44,6 +44,7 @@ class Lasso:
         self.beta = None  # array of beta_j, 1*j
         self.beta_0 = None  # beta_0, scalar
         self.lmd = None  # lambda
+        self.dof = None  # degree of freedom
         self.max_iter = max_iter  # maximum iterations
         self.stop_crit = stop_crit  # stopping criterion
         self.shifts = None  # centralization changes,
@@ -172,8 +173,13 @@ class Lasso:
             gamma = self.n * self.lmd / X_j_X_j
             self.beta[j] = Lasso.soft_thresh(beta_j_hat, gamma)
 
-    def _coordinate_descent(self) -> None:
-        """Coordinate descent"""
+    def _run(self) -> None:
+        """Run the model
+            1) coordinate descent
+            2) adjustment
+            3) calculate degree of freedom
+        """
+        # coordinate descent
         for _ in range(self.max_iter):
             all_beta_old = np.insert(self.beta, 0, self.beta_0)
             self._update_beta()
@@ -182,14 +188,12 @@ class Lasso:
             abs_pct_chg = np.abs(Lasso.protected_div(chg, all_beta_old))
             if (abs_pct_chg < self.stop_crit).all():
                 break
-
-    def _adjust(self) -> None:
-        """Adjust `self.beta_0` and `self.lmd` affected by normalization; keep `self.y`
-        and `self.X` the same, which is more convenient for `refit()`
-        """
+        # adjust beta_0 and lambda affected by normalization, keep y and X the same
         self.beta_0 = self.beta_0 * self.scale - self.shifts.dot(self.beta)
         self.lmd *= self.scale**2
-
+        # degree of freedom
+        self.dof = np.sum(np.abs(self.beta))
+        
     def fit(
         self,
         y: np.ndarray | pd.DataFrame,
@@ -221,12 +225,9 @@ class Lasso:
         self.y, self.X = np.array(y), np.array(X)
         self.n, self.p = X.shape
         self.lmd = lmd
-        # build
+        # build and run
         self._build()
-        # coordinate descent
-        self._coordinate_descent()
-        # adjust
-        self._adjust()
+        self._run()
         return self
 
     def predict(self, X: np.ndarray | pd.DataFrame) -> np.ndarray | pd.DataFrame:
@@ -279,10 +280,8 @@ class Lasso:
         # reset beta and beta_0
         self.beta_0 = self.y_bar
         self.beta = np.random.randn(self.p)
-        # coordinate descent
-        self._coordinate_descent()
-        # adjust
-        self._adjust()
+        # run
+        self._run()
         return self
 
     def path_fit(
@@ -332,11 +331,13 @@ class Lasso:
         # build
         self._build()
         # iterate lambda
-        lmd_path, beta_path, beta_0_path, resid_path = [], [], [], []
+        lmd_path, dof_path = [], []
+        beta_path, beta_0_path, resid_path = [], [], []
         flag = True
         while (flag or can_stop) and lmd < lmd_max:
             self.refit(lmd)
-            lmd_path.append(lmd)
+            lmd_path.append(self.lmd)
+            dof_path.append(self.dof)
             beta_path.append(self.beta)
             beta_0_path.append(self.beta_0)
             resid_path.append(y - self.predict(X))
@@ -346,6 +347,7 @@ class Lasso:
         self.l = len(lmd_path)
         self.lmd_min, self.lmd_max = lmd_min, lmd
         self.lmd_path = np.array(lmd_path)
+        self.dof_path = np.array(dof_path)
         self.beta_path = np.array(beta_path).T
         self.beta_0_path = np.array(beta_0_path)
         self.resid_path = np.array(resid_path).T
@@ -374,21 +376,6 @@ class Lasso:
         plt.tight_layout()
         plt.show()
 
-    def draw_mse_path(self) -> None:
-        """Draw the path of in-sample MSE (mean squared error) as dark curves and the
-        pathes of in-sample SE (squared error) of each sample as light curves
-        """
-        if self.mse_path is None:
-            raise Exception("`path_fit()` has not been called")
-        # plot
-        plt.figure(figsize=(12, 8))
-        for i in range(self.n):
-            plt.plot(self.lmd_path, self.se_path[i], color="#87CEFA", alpha=0.3)
-        plt.plot(self.lmd_path, self.mse_path, color="b")
-        plt.xlabel("lambda")
-        plt.ylabel("MSE (dark) / SE (light)")
-        plt.show()
-
 
 if __name__ == "__main__":
     import time
@@ -404,6 +391,7 @@ if __name__ == "__main__":
     # m = L(alpha=1)
     # start = time.time()
     # m.fit(X, y)
+    # print(m.intercept_)
     # print(m.coef_)
     # print(time.time() - start, "t")
 
@@ -411,6 +399,7 @@ if __name__ == "__main__":
     # start = time.time()
     # lasso.fit(y, X, 2)
     # lasso.refit(1)
+    # print(lasso.beta_0)
     # print(lasso.beta)
     # print(time.time() - start, "t")
 
@@ -419,4 +408,3 @@ if __name__ == "__main__":
     lasso.path_fit(y, X, step_size=0.2)
     print(time.time() - start)
     lasso.draw_beta_path()
-    # lasso.draw_mse_path()
