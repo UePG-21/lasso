@@ -158,7 +158,7 @@ class Lasso:
 
     def _update_beta(self) -> None:
         """Update `self.beta`
-        
+
         minimize (1/2)*(beta_j - \hat{beta_j})^2 + gamma * |beta_j|
         => beta_j^star = S(\hat{beta_j}, gamma)
         where
@@ -175,9 +175,9 @@ class Lasso:
 
     def _run(self) -> None:
         """Run the model
-            1) coordinate descent
-            2) adjustment
-            3) calculate degree of freedom
+        1) coordinate descent
+        2) adjustment
+        3) calculate degree of freedom
         """
         # coordinate descent
         for _ in range(self.max_iter):
@@ -193,7 +193,7 @@ class Lasso:
         self.lmd *= self.scale**2
         # degree of freedom
         self.dof = np.sum(np.abs(self.beta))
-        
+
     def fit(
         self,
         y: np.ndarray | pd.DataFrame,
@@ -251,18 +251,13 @@ class Lasso:
         return y_pred
 
     def score(
-        self,
-        y: np.ndarray | pd.DataFrame,
-        X: np.ndarray | pd.DataFrame,
+        self, y: np.ndarray | pd.DataFrame, X: np.ndarray | pd.DataFrame
     ) -> float:
         if self.beta is None:
             raise Exception("model has not been fitted")
         return mean_squared_error(y, self.predict(X))
 
-    def refit(
-        self,
-        lmd: int | float,
-    ) -> "Lasso":
+    def refit(self, lmd: int | float) -> "Lasso":
         """Refit the model with a new `lambda` but the original `y` and `X`
 
         Parameters
@@ -291,8 +286,13 @@ class Lasso:
         lmd_min: int | float | None = None,
         lmd_max: int | float | None = None,
         step_size: int | float = 0.1,
+        lmds: np.ndarray | None = None,
     ) -> "Lasso":
         """Fit the model with different `lambda`'s to get pathes of `beta`
+
+        Two ways to work:
+            1) pass in `lmd_min`, `lmd_max` and `step_size`
+            2) pass in `lmds`
 
         Parameters
         ----------
@@ -306,12 +306,17 @@ class Lasso:
             Maximum `lambda` (not including), by default None
         step_size : int | float, optional
             Step size of `lambda` change, by default 0.1
+        lmds : list | np.ndarray | None, optional
+            `lambda`s used to fit the model, by default None
 
         Returns
         -------
         Lasso
             The model itself
         """
+        if lmds is not None:
+            lmds = np.sort(lmds)
+            lmd_min, lmd_max = lmds[0], lmds[-1]
         if lmd_min is None:
             lmd_min = 0
         can_stop = True
@@ -319,9 +324,10 @@ class Lasso:
             can_stop = False
             lmd_max = float("inf")
         if lmd_min < 0:
-            raise Exception("`lmd` should not be less than 0")
+            raise Exception("`lmd_min` should not be less than 0")
         if lmd_max < lmd_min:
             raise Exception("`lmd_max` should not be less than `lmd_min`")
+        
         # assign attributes
         self.features = X.columns if isinstance(X, pd.DataFrame) else None
         self.y, self.X = np.array(y), np.array(X)
@@ -333,16 +339,25 @@ class Lasso:
         # iterate lambda
         lmd_path, dof_path = [], []
         beta_path, beta_0_path, resid_path = [], [], []
-        flag = True
-        while (flag or can_stop) and lmd < lmd_max:
-            self.refit(lmd)
-            lmd_path.append(self.lmd)
-            dof_path.append(self.dof)
-            beta_path.append(self.beta)
-            beta_0_path.append(self.beta_0)
-            resid_path.append(y - self.predict(X))
-            lmd += step_size
-            flag = (np.abs(beta_path[-1]) > 1e-9).any()
+        if lmds is not None:
+            lmd_path = lmds
+            for lmd in lmd_path:
+                self.refit(lmd)
+                dof_path.append(self.dof)
+                beta_path.append(self.beta)
+                beta_0_path.append(self.beta_0)
+                resid_path.append(y - self.predict(X))
+        else:
+            flag = True
+            while (flag or can_stop) and lmd < lmd_max:
+                self.refit(lmd)
+                lmd_path.append(self.lmd)
+                dof_path.append(self.dof)
+                beta_path.append(self.beta)
+                beta_0_path.append(self.beta_0)
+                resid_path.append(y - self.predict(X))
+                lmd += step_size
+                flag = (np.abs(beta_path[-1]) > 1e-9).any()
         # store results
         self.l = len(lmd_path)
         self.lmd_min, self.lmd_max = lmd_min, lmd
@@ -380,12 +395,16 @@ class Lasso:
 if __name__ == "__main__":
     import time
 
-    n, p = 100, 20
-    X = np.random.uniform(10, 20, (n, p))
-    eps = np.random.randn(n)
+    m_set, n_train, p = 100, 100, 50
+    # true coefficients
     beta_true = np.random.randint(-10, 10, p)
     beta_0_true = 0
-    y = beta_0_true + X.dot(beta_true) + eps
+    # error variance and feature variance
+    sig_eps = 1
+    sig_X = np.random.randn(p)
+    X_train = np.random.normal(0, 1, (n_train, p)) * sig_X.reshape((-1, p))
+    eps_train = sig_eps * np.random.randn(n_train)
+    y_train = X_train.dot(beta_true) + eps_train
 
     # from sklearn.linear_model import Lasso as L
     # m = L(alpha=1)
@@ -405,6 +424,6 @@ if __name__ == "__main__":
 
     lasso = Lasso()
     start = time.time()
-    lasso.path_fit(y, X, step_size=0.2)
+    lasso.path_fit(y_train, X_train, lmds=[0.01, 0.1, 0.2, 0.5, 1, 1.5, 5, 10])
     print(time.time() - start)
     lasso.draw_beta_path()
