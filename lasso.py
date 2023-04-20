@@ -31,7 +31,7 @@ class Lasso:
         max_iter : int, optional
             The maximum number of iterations, by default 1000
         stop_crit : float, optional
-            Stopping criterion for beta_0 and beta update, which is if all bete's
+            Stopping criterion for `beta_0` and `beta` update, which is if all `bete`'s
             absolute update percentages are less than this number in a coordinate
             descent loop, by default 0.001
         """
@@ -113,17 +113,17 @@ class Lasso:
     def _build(self) -> None:
         """Build the model
 
-        Normalization (to speed up the convergence of `beta` and `beta_0`)
-            1) centralize: minus each `X_j` by different numbers, `self.shifts`
-            2) scale: divide all `X_j` and `y` by the same number, `self.scale`
+        1) Normalization (to speed up the convergence of `beta` and `beta_0`)
+            - centralize: minus each `X_j` by different numbers, `self.shifts`
+            - scale: divide all `X_j` and `y` by the same number, `self.scale`
 
-        Precomputation (to speed the iteration process in coordinate descent)
-            1) sample means: `self.y_bar` and `self.X_bar`
-            2) inner products: `self.y_X`, `self.o_X` (all 0), and `self.X_X`
+        2) Precomputation (to speed the iteration process in coordinate descent)
+            - sample means: `self.y_bar` and `self.X_bar`
+            - inner products: `self.y_X`, `self.o_X` (all 0), and `self.X_X`
 
-        Initialization of `beta_0` and `beta`
-            1) `beta_0` = `y_bar` is already the final solution given `X_j` = 0
-            2) initialize each `beta_j` in `beta` randomly
+        3) Initialization of `beta_0` and `beta`
+            - `beta_0` = `y_bar` is already the final solution given `X_j` = 0
+            - initialize each `beta_j` in `beta` randomly
         """
         # normalize
         self.shifts = self.X.mean(axis=0)
@@ -161,6 +161,7 @@ class Lasso:
 
         minimize (1/2)*(beta_j - \hat{beta_j})^2 + gamma * |beta_j|
         => beta_j^star = S(\hat{beta_j}, gamma)
+
         where
             \hat{beta_j} = <Z_j, X_j> / ||X_j||^2
             Z_j = (Z_1j, ..., Z_nj)^T
@@ -175,20 +176,18 @@ class Lasso:
 
     def _run(self) -> None:
         """Run the model
-        1) coordinate descent
-        2) adjustment
-        3) calculate degree of freedom
+        1) Optimize via coordinate descent
+        2) Adjust `beta_0` and `lambda` affected by normalization
+        3) Calculate degree of freedom := sum_{j=1}^{p}{abs(beta_j)}
         """
         # coordinate descent
         for _ in range(self.max_iter):
-            all_beta_old = np.insert(self.beta, 0, self.beta_0)
+            beta_old = self.beta.copy()
             self._update_beta()
-            all_beta_new = np.insert(self.beta, 0, self.beta_0)
-            chg = all_beta_new - all_beta_old
-            abs_pct_chg = np.abs(Lasso.protected_div(chg, all_beta_old))
-            if (abs_pct_chg < self.stop_crit).all():
+            pct_chg = Lasso.protected_div(self.beta - beta_old, beta_old)
+            if (np.abs(pct_chg) < self.stop_crit).all():
                 break
-        # adjust beta_0 and lambda affected by normalization, keep y and X the same
+        # adjustment
         self.beta_0 = self.beta_0 * self.scale - self.shifts.dot(self.beta)
         self.lmd *= self.scale**2
         # degree of freedom
@@ -209,7 +208,7 @@ class Lasso:
         X : np.ndarray | pd.DataFrame
             Features
         lmd : int | float
-            lambda as the regularization parameter
+            `lambda` as the regularization parameter
 
         Returns
         -------
@@ -307,7 +306,7 @@ class Lasso:
         step_size : int | float, optional
             Step size of `lambda` change, by default 0.1
         lmds : list | np.ndarray | None, optional
-            `lambda`s used to fit the model, by default None
+            `lambda`'s used to fit the model, by default None
 
         Returns
         -------
@@ -327,7 +326,6 @@ class Lasso:
             raise Exception("`lmd_min` should not be less than 0")
         if lmd_max < lmd_min:
             raise Exception("`lmd_max` should not be less than `lmd_min`")
-        
         # assign attributes
         self.features = X.columns if isinstance(X, pd.DataFrame) else None
         self.y, self.X = np.array(y), np.array(X)
@@ -406,21 +404,21 @@ if __name__ == "__main__":
     eps_train = sig_eps * np.random.randn(n_train)
     y_train = X_train.dot(beta_true) + eps_train
 
-    # from sklearn.linear_model import Lasso as L
-    # m = L(alpha=1)
-    # start = time.time()
-    # m.fit(X, y)
-    # print(m.intercept_)
-    # print(m.coef_)
-    # print(time.time() - start, "t")
+    from sklearn.linear_model import Lasso as L
+    m = L(alpha=1)
+    start = time.time()
+    m.fit(X_train, y_train)
+    print(m.intercept_)
+    print(m.coef_)
+    print(time.time() - start, "t")
 
-    # lasso = Lasso()
-    # start = time.time()
-    # lasso.fit(y, X, 2)
-    # lasso.refit(1)
-    # print(lasso.beta_0)
-    # print(lasso.beta)
-    # print(time.time() - start, "t")
+    lasso = Lasso()
+    start = time.time()
+    lasso.fit(y_train, X_train, 2)
+    lasso.refit(1)
+    print(lasso.beta_0)
+    print(lasso.beta)
+    print(time.time() - start, "t")
 
     lasso = Lasso()
     start = time.time()
