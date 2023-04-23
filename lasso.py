@@ -405,6 +405,7 @@ if __name__ == "__main__":
     y_train = X_train.dot(beta_true) + eps_train
 
     from sklearn.linear_model import Lasso as L
+
     m = L(alpha=1)
     start = time.time()
     m.fit(X_train, y_train)
