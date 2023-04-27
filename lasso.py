@@ -67,7 +67,7 @@ class Lasso:
     def protected_div(
         num: float | np.ndarray, den: float | np.ndarray
     ) -> float | np.ndarray:
-        """Calculate protected division, avoiding denominator being 0
+        """Calculate protected division, avoiding denominators being 0
 
         Parameters
         ----------
