@@ -1,5 +1,5 @@
 # lasso
-Self-implemented of LASSO
+Self-implemented version of LASSO
 
 ## Comments
 - Accelerated by 
